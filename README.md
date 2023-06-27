@@ -1,1 +1,4 @@
-# getting-started-search-java
+# Getting Started with Atlas Search in Java
+
+    ./gradlew run
+
