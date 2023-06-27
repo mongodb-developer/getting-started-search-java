@@ -18,7 +18,6 @@ public class FirstSearchExample {
     public static void main(String[] args) {
         // Replace the placeholder with your MongoDB deployment's connection string
         String uri = "<<insert your MongoDB Atlas connection string here>>";
-        uri = "mongodb+srv://demo_user:your_password@cluster0.homyovq.mongodb.net/?retryWrites=true&w=majority";
 
         try (MongoClient mongoClient = MongoClients.create(uri)) {
             // set namespace
