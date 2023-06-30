@@ -16,8 +16,8 @@ import static com.mongodb.client.model.search.SearchPath.*;
 
 public class FirstSearchExample {
     public static void main(String[] args) {
-        // Replace the placeholder with your MongoDB Atlas connection string
-        String uri = "<<insert your MongoDB Atlas connection string here>>";
+        // Set ATLAS_URI in your environment
+        String uri = System.getenv("ATLAS_URI");
 
         try (MongoClient mongoClient = MongoClients.create(uri)) {
             MongoDatabase database = mongoClient.getDatabase("sample_mflix");
