@@ -1,18 +1,34 @@
 package com.mongodb.atlas;
 
-import com.mongodb.client.*;
-import com.mongodb.client.model.search.*;
-import org.bson.*;
-import org.bson.conversions.*;
-import org.bson.json.*;
-import java.util.*;
+import com.mongodb.client.AggregateIterable;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.search.SearchOperator;
+import org.bson.BsonArray;
+import org.bson.BsonDocument;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.json.JsonMode;
+import org.bson.json.JsonWriterSettings;
+
+import java.util.Arrays;
+import java.util.List;
 
 import static com.mongodb.client.model.Aggregates.limit;
 import static com.mongodb.client.model.Aggregates.project;
 import static com.mongodb.client.model.Aggregates.search;
 
-import static com.mongodb.client.model.Projections.*;
-import static com.mongodb.client.model.search.SearchPath.*;
+import static com.mongodb.client.model.Projections.excludeId;
+import static com.mongodb.client.model.Projections.fields;
+import static com.mongodb.client.model.Projections.include;
+import static com.mongodb.client.model.Projections.meta;
+import static com.mongodb.client.model.Projections.metaSearchScore;
+import static com.mongodb.client.model.search.SearchOperator.compound;
+import static com.mongodb.client.model.search.SearchOperator.text;
+import static com.mongodb.client.model.search.SearchOptions.searchOptions;
+import static com.mongodb.client.model.search.SearchPath.fieldPath;
 
 public class FirstSearchExample {
     public static void main(String[] args) {
@@ -23,21 +39,21 @@ public class FirstSearchExample {
             MongoDatabase database = mongoClient.getDatabase("sample_mflix");
             MongoCollection<Document> collection = database.getCollection("movies");
 
-            SearchOperator genresClause = SearchOperator.compound()
+            SearchOperator genresClause = compound()
                     .must(Arrays.asList(
-                            SearchOperator.text(fieldPath("genres"),"Drama"),
-                            SearchOperator.text(fieldPath("genres"), "Romance")
+                            text(fieldPath("genres"),"Drama"),
+                            text(fieldPath("genres"), "Romance")
                     ));
 
             Document searchQuery = new Document("phrase",
                                         new Document("query", "keanu reeves")
-                                             .append("path", fieldPath("cast")));
+                                             .append("path", "cast"));
 
             Bson searchStage = search(
-                    SearchOperator.compound()
+                    compound()
                             .filter(List.of(genresClause))
                             .must(List.of(SearchOperator.of(searchQuery))),
-                    SearchOptions.searchOptions().option("scoreDetails", BsonBoolean.TRUE)
+                    searchOptions().option("scoreDetails", true)
             );
 
             // Create a pipeline that searches, projects, and limits the number of results returned.
