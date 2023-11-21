@@ -1,6 +1,8 @@
 plugins {
     id 'java'
     id 'application'
+    id 'war'
+    id 'org.gretty' version '4.1.1'
 }
 
 group 'com.mongodb.atlas'
@@ -13,8 +15,13 @@ repositories {
 dependencies {
     implementation 'org.mongodb:mongodb-driver-sync:4.10.1'
     implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.17.1'
+    providedCompile 'javax.servlet:javax.servlet-api:3.1.0'
 }
 
 application {
     mainClass = 'com.mongodb.atlas.FirstSearchExample'
+}
+
+gretty {
+  contextPath = '/'
 }
