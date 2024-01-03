@@ -14,13 +14,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.bson.BsonArray;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static com.mongodb.client.model.Aggregates.limit;
@@ -45,13 +46,12 @@ public class SearchServlet extends HttpServlet {
       throw new ServletException("ATLAS_URI must be specified");
     }
 
-    // TODO: get these from servlet config
     String database_name = config.getInitParameter("database");
     String collection_name = config.getInitParameter("collection");
     index_name = config.getInitParameter("index");
 
-    MongoClient mongoClient = MongoClients.create(uri);
-    MongoDatabase database = mongoClient.getDatabase(database_name);
+    MongoClient mongo_client = MongoClients.create(uri);
+    MongoDatabase database = mongo_client.getDatabase(database_name);
     collection = database.getCollection(collection_name);
 
     super.init(config);
@@ -82,8 +82,8 @@ public class SearchServlet extends HttpServlet {
 
     // Validate params
     List<String> errors = new ArrayList<>();
-    int skip = Math.min(100, skip_value == null ? 0 : Integer.valueOf(skip_value));
-    int limit = Math.min(25, limit_value == null ? 10 : Integer.valueOf(limit_value));
+    int skip = Math.min(100, skip_value == null ? 0 : Integer.parseInt(skip_value));
+    int limit = Math.min(25, limit_value == null ? 10 : Integer.parseInt(limit_value));
     boolean debug = Boolean.parseBoolean(debug_value);
 
     if (q == null || q.length() == 0) errors.add("`q` is missing");
@@ -98,9 +98,9 @@ public class SearchServlet extends HttpServlet {
           errors.add("Invalid `filter`: " + filter);
         } else {
           filter_operators.add(SearchOperator.of(
-              new Document("phrase",
+              new Document("equals",
                   new Document("path", filter.substring(0,c))
-                      .append("query", filter.substring(c+1)))
+                      .append("value", filter.substring(c+1)))
           ));
         }
       }
@@ -165,35 +165,39 @@ public class SearchServlet extends HttpServlet {
     }
     Bson projection = fields(projections);
 
-    // TODO: retrieve count of matched docs
-    AggregateIterable<Document> aggregationResults = collection.aggregate(List.of(
+    // Using $facet stage to provide both the documents and $$SEARCH_META data.
+    // The $$SEARCH_META data contains the total matching document count, etc
+    Bson facet_stage = new Document("$facet",
+      new Document("docs",
+        Arrays.asList(skip(skip), limit(limit), project(projection)))
+      .append("meta",
+        Arrays.asList(new Document("$replaceWith", "$$SEARCH_META"), limit(1)))
+    );
+
+    AggregateIterable<Document> aggregation_results = collection.aggregate(List.of(
         searchStage,
-        project(projection),
-        skip(skip),
-        limit(limit)));
+        facet_stage
+    ));
 
     Document response_doc = new Document();
-    response_doc.put("meta", new Document()
+    response_doc.put("request", new Document()
         .append("q", q)
         .append("skip", skip)
         .append("limit", limit)
         .append("search", search_fields_value)
         .append("project", project_fields_value)
-        .append("filter", filters==null ? null : List.of(filters))); // TODO: fix output
-    if (debug) {
-      response_doc.put("debug", aggregationResults.explain().toBsonDocument());
-    }
-    BsonArray docs = new BsonArray();
+        .append("filter", filters==null ? Collections.EMPTY_LIST : List.of(filters)));
 
-    try {
-      for (Document aggregationResult : aggregationResults) {
-        docs.add(aggregationResult.toBsonDocument());
-      }
-    } catch (Exception e) {
-      response.sendError(400, e.getLocalizedMessage());
-      return;
+    if (debug) {
+      response_doc.put("debug", aggregation_results.explain().toBsonDocument());
     }
-    response_doc.put("docs", docs);
+
+    // When using $facet stage, only one "document" is returned,
+    // containing the keys specified above: "docs" and "meta"
+    Document results = aggregation_results.first();
+    for (String s : results.keySet()) {
+      response_doc.put(s,results.get(s));
+    }
 
     response.setContentType("text/json");
     PrintWriter writer = response.getWriter();
