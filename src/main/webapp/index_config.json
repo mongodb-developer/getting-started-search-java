@@ -1,0 +1,25 @@
+{
+  "analyzer": "lucene.english",
+  "searchAnalyzer": "lucene.english",
+  "mappings": {
+    "dynamic": true,
+    "fields": {
+      "cast": [
+        {
+          "type": "token"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "genres": [
+        {
+          "type": "token"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

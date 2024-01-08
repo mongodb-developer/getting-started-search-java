@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.mongodb.client.model.Aggregates.limit;
 import static com.mongodb.client.model.Aggregates.project;
@@ -39,8 +41,14 @@ public class SearchServlet extends HttpServlet {
   private MongoCollection<Document> collection;
   private String index_name;
 
+  private Logger logger;
+
   @Override
   public void init(ServletConfig config) throws ServletException {
+    super.init(config);
+
+    logger = Logger.getLogger(config.getServletName());
+
     String uri = System.getenv("ATLAS_URI");
     if (uri == null) {
       throw new ServletException("ATLAS_URI must be specified");
@@ -50,11 +58,14 @@ public class SearchServlet extends HttpServlet {
     String collection_name = config.getInitParameter("collection");
     index_name = config.getInitParameter("index");
 
+    logger.log(Level.INFO, "Servlet Name: " + config.getServletName());
+    logger.log(Level.INFO, "Context Path: " + config.getServletContext().getContextPath());
+    logger.log(Level.INFO, "Servlet Context Name: " + config.getServletContext().getServletContextName());
+    logger.log(Level.INFO, "Index Name: " + index_name);
+
     MongoClient mongo_client = MongoClients.create(uri);
     MongoDatabase database = mongo_client.getDatabase(database_name);
     collection = database.getCollection(collection_name);
-
-    super.init(config);
   }
 
   /**
@@ -74,16 +85,16 @@ public class SearchServlet extends HttpServlet {
   protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
     String q = request.getParameter("q");
     String search_fields_value = request.getParameter("search");
-    String skip_value = request.getParameter("skip");
     String limit_value = request.getParameter("limit");
+    String skip_value = request.getParameter("skip");
     String project_fields_value = request.getParameter("project");
     String debug_value = request.getParameter("debug");
     String[] filters = request.getParameterMap().get("filter");
 
     // Validate params
     List<String> errors = new ArrayList<>();
-    int skip = Math.min(100, skip_value == null ? 0 : Integer.parseInt(skip_value));
     int limit = Math.min(25, limit_value == null ? 10 : Integer.parseInt(limit_value));
+    int skip = Math.min(100, skip_value == null ? 0 : Integer.parseInt(skip_value));
     boolean debug = Boolean.parseBoolean(debug_value);
 
     if (q == null || q.length() == 0) errors.add("`q` is missing");

@@ -17,7 +17,7 @@
         </init-param>
         <init-param>
             <param-name>index</param-name>
-            <param-value>default</param-value>
+            <param-value>movies_index</param-value>
         </init-param>
     </servlet>
 
