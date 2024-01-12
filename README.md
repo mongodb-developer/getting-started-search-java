@@ -4,6 +4,10 @@ This repository contains examples of using Atlas Search with Java.
 
 ## First Search Example
 
+This First Search Example code was written for the article ["Using Atlas Search From Java"](https://www.mongodb.com/developer/products/atlas/atlas-search-java/).
+
+This example uses the `run` target and searches the `default` index.
+
 In order to run the `FirstSearchExample`, follow these steps:
 
   * Add the [sample collections](https://www.mongodb.com/docs/atlas/sample-data/) to your Atlas cluster
@@ -13,6 +17,10 @@ In order to run the `FirstSearchExample`, follow these steps:
     `ATLAS_URI="<<insert your connection string here>>" ./gradlew run`
 
 ## Search Server Example
+
+This Search Server example code was written for the article
+("How to Build a Search Service in Java with MongoDB")[TBD].
+It uses the `jettyRun` target and searches the `movies_index`
 
 To run the search server locally, follow these steps:
 
