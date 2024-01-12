@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.mongodb.client.model.Aggregates.limit;
@@ -39,7 +38,7 @@ import static com.mongodb.client.model.search.SearchOptions.searchOptions;
 
 public class SearchServlet extends HttpServlet {
   private MongoCollection<Document> collection;
-  private String index_name;
+  private String indexName;
 
   private Logger logger;
 
@@ -54,18 +53,15 @@ public class SearchServlet extends HttpServlet {
       throw new ServletException("ATLAS_URI must be specified");
     }
 
-    String database_name = config.getInitParameter("database");
-    String collection_name = config.getInitParameter("collection");
-    index_name = config.getInitParameter("index");
-
-    logger.log(Level.INFO, "Servlet Name: " + config.getServletName());
-    logger.log(Level.INFO, "Context Path: " + config.getServletContext().getContextPath());
-    logger.log(Level.INFO, "Servlet Context Name: " + config.getServletContext().getServletContextName());
-    logger.log(Level.INFO, "Index Name: " + index_name);
+    String databaseName = config.getInitParameter("database");
+    String collectionName = config.getInitParameter("collection");
+    indexName = config.getInitParameter("index");
 
     MongoClient mongo_client = MongoClients.create(uri);
-    MongoDatabase database = mongo_client.getDatabase(database_name);
-    collection = database.getCollection(collection_name);
+    MongoDatabase database = mongo_client.getDatabase(databaseName);
+    collection = database.getCollection(collectionName);
+
+    logger.info("Servlet " + config.getServletName() + " initialized: " + databaseName + " / " + collectionName + " / " + indexName);
   }
 
   /**
@@ -92,15 +88,21 @@ public class SearchServlet extends HttpServlet {
     String[] filters = request.getParameterMap().get("filter");
 
     // Validate params
-    List<String> errors = new ArrayList<>();
     int limit = Math.min(25, limitValue == null ? 10 : Integer.parseInt(limitValue));
     int skip = Math.min(100, skipValue == null ? 0 : Integer.parseInt(skipValue));
     boolean debug = Boolean.parseBoolean(debugValue);
 
-    if (q == null || q.length() == 0) errors.add("`q` is missing");
-    if (searchFieldsValue == null) errors.add("`search` fields-list required");
+    if (q == null || q.length() == 0) {
+      response.sendError(400, "`q` is missing");
+      return;
+    }
+    if (searchFieldsValue == null) {
+      response.sendError(400, "`search` fields-list required");
+      return;
+    }
 
     List<SearchOperator> filterOperators = new ArrayList<>();
+    List<String> errors = new ArrayList<>();
     if (filters != null) {
       for (String filter : filters) {
         int c = filter.indexOf(':');
@@ -156,7 +158,7 @@ public class SearchServlet extends HttpServlet {
         operator,
         searchOptions()
             .option("scoreDetails", debug)
-            .index(index_name)
+            .index(indexName)
             .count(SearchCount.total())
     );
 
@@ -206,13 +208,17 @@ public class SearchServlet extends HttpServlet {
     // When using $facet stage, only one "document" is returned,
     // containing the keys specified above: "docs" and "meta"
     Document results = aggregationResults.first();
-    for (String s : results.keySet()) {
-      responseDoc.put(s,results.get(s));
+    if (results != null) {
+      for (String s : results.keySet()) {
+        responseDoc.put(s,results.get(s));
+      }
     }
 
     response.setContentType("text/json");
     PrintWriter writer = response.getWriter();
     writer.println(responseDoc.toJson());
     writer.close();
+
+    logger.info(request.getServletPath() + "?" + request.getQueryString());
   }
 }
