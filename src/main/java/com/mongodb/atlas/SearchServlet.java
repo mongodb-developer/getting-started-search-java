@@ -84,23 +84,23 @@ public class SearchServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
     String q = request.getParameter("q");
-    String search_fields_value = request.getParameter("search");
-    String limit_value = request.getParameter("limit");
-    String skip_value = request.getParameter("skip");
-    String project_fields_value = request.getParameter("project");
-    String debug_value = request.getParameter("debug");
+    String searchFieldsValue = request.getParameter("search");
+    String limitValue = request.getParameter("limit");
+    String skipValue = request.getParameter("skip");
+    String projectFieldsValue = request.getParameter("project");
+    String debugValue = request.getParameter("debug");
     String[] filters = request.getParameterMap().get("filter");
 
     // Validate params
     List<String> errors = new ArrayList<>();
-    int limit = Math.min(25, limit_value == null ? 10 : Integer.parseInt(limit_value));
-    int skip = Math.min(100, skip_value == null ? 0 : Integer.parseInt(skip_value));
-    boolean debug = Boolean.parseBoolean(debug_value);
+    int limit = Math.min(25, limitValue == null ? 10 : Integer.parseInt(limitValue));
+    int skip = Math.min(100, skipValue == null ? 0 : Integer.parseInt(skipValue));
+    boolean debug = Boolean.parseBoolean(debugValue);
 
     if (q == null || q.length() == 0) errors.add("`q` is missing");
-    if (search_fields_value == null) errors.add("`search` fields-list required");
+    if (searchFieldsValue == null) errors.add("`search` fields-list required");
 
-    List<SearchOperator> filter_operators = new ArrayList<>();
+    List<SearchOperator> filterOperators = new ArrayList<>();
     if (filters != null) {
       for (String filter : filters) {
         int c = filter.indexOf(':');
@@ -108,7 +108,7 @@ public class SearchServlet extends HttpServlet {
         if (c == -1) {
           errors.add("Invalid `filter`: " + filter);
         } else {
-          filter_operators.add(SearchOperator.of(
+          filterOperators.add(SearchOperator.of(
               new Document("equals",
                   new Document("path", filter.substring(0,c))
                       .append("value", filter.substring(c+1)))
@@ -122,35 +122,35 @@ public class SearchServlet extends HttpServlet {
       return;
     }
 
-    String[] search_fields = search_fields_value.split(",");
+    String[] searchFields = searchFieldsValue.split(",");
 
-    List<String> project_fields = new ArrayList<>();
-    if (project_fields_value != null) {
-      project_fields.addAll(List.of(project_fields_value.split(",")));
+    List<String> projectFields = new ArrayList<>();
+    if (projectFieldsValue != null) {
+      projectFields.addAll(List.of(projectFieldsValue.split(",")));
     }
 
     boolean include_id = false;
-    if (project_fields.contains("_id")) {
+    if (projectFields.contains("_id")) {
       include_id = true;
-      project_fields.remove("_id");
+      projectFields.remove("_id");
     }
 
-    boolean include_score = false;
-    if (project_fields.contains("_score")) {
-      include_score = true;
-      project_fields.remove("_score");
+    boolean includeScore = false;
+    if (projectFields.contains("_score")) {
+      includeScore = true;
+      projectFields.remove("_score");
     }
 
     // $search
-    List<SearchPath> search_path = new ArrayList<>();
-    for (String search_field : search_fields) {
-      search_path.add(SearchPath.fieldPath(search_field));
+    List<SearchPath> searchPath = new ArrayList<>();
+    for (String search_field : searchFields) {
+      searchPath.add(SearchPath.fieldPath(search_field));
     }
 
     CompoundSearchOperator operator = SearchOperator.compound()
-        .must(List.of(SearchOperator.text(search_path, List.of(q))));
-    if (filter_operators.size() > 0)
-      operator = operator.filter(filter_operators);
+        .must(List.of(SearchOperator.text(searchPath, List.of(q))));
+    if (filterOperators.size() > 0)
+      operator = operator.filter(filterOperators);
 
     Bson searchStage = search(
         operator,
@@ -162,7 +162,7 @@ public class SearchServlet extends HttpServlet {
 
     // $project
     List<Bson> projections = new ArrayList<>();
-    projections.add(include(project_fields));
+    projections.add(include(projectFields));
     if (include_id) {
       projections.add(include("_id"));
     } else {
@@ -171,48 +171,48 @@ public class SearchServlet extends HttpServlet {
     if (debug) {
       projections.add(meta("_scoreDetails", "searchScoreDetails"));
     }
-    if (include_score) {
+    if (includeScore) {
       projections.add(metaSearchScore("_score"));
     }
     Bson projection = fields(projections);
 
     // Using $facet stage to provide both the documents and $$SEARCH_META data.
     // The $$SEARCH_META data contains the total matching document count, etc
-    Bson facet_stage = new Document("$facet",
+    Bson facetStage = new Document("$facet",
       new Document("docs",
         Arrays.asList(skip(skip), limit(limit), project(projection)))
       .append("meta",
         Arrays.asList(new Document("$replaceWith", "$$SEARCH_META"), limit(1)))
     );
 
-    AggregateIterable<Document> aggregation_results = collection.aggregate(List.of(
+    AggregateIterable<Document> aggregationResults = collection.aggregate(List.of(
         searchStage,
-        facet_stage
+        facetStage
     ));
 
-    Document response_doc = new Document();
-    response_doc.put("request", new Document()
+    Document responseDoc = new Document();
+    responseDoc.put("request", new Document()
         .append("q", q)
         .append("skip", skip)
         .append("limit", limit)
-        .append("search", search_fields_value)
-        .append("project", project_fields_value)
+        .append("search", searchFieldsValue)
+        .append("project", projectFieldsValue)
         .append("filter", filters==null ? Collections.EMPTY_LIST : List.of(filters)));
 
     if (debug) {
-      response_doc.put("debug", aggregation_results.explain().toBsonDocument());
+      responseDoc.put("debug", aggregationResults.explain().toBsonDocument());
     }
 
     // When using $facet stage, only one "document" is returned,
     // containing the keys specified above: "docs" and "meta"
-    Document results = aggregation_results.first();
+    Document results = aggregationResults.first();
     for (String s : results.keySet()) {
-      response_doc.put(s,results.get(s));
+      responseDoc.put(s,results.get(s));
     }
 
     response.setContentType("text/json");
     PrintWriter writer = response.getWriter();
-    writer.println(response_doc.toJson());
+    writer.println(responseDoc.toJson());
     writer.close();
   }
 }
