@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
+import static com.mongodb.client.model.Aggregates.facet;
 import static com.mongodb.client.model.Aggregates.limit;
 import static com.mongodb.client.model.Aggregates.project;
 import static com.mongodb.client.model.Aggregates.search;
@@ -164,11 +165,14 @@ public class SearchServlet extends HttpServlet {
 
     // $project
     List<Bson> projections = new ArrayList<>();
-    projections.add(include(projectFields));
-    if (include_id) {
-      projections.add(include("_id"));
-    } else {
-      projections.add(excludeId());
+    if (projectFieldsValue != null) {
+      // Don't add _id inclusion or exclusion if no `project` parameter specified
+      projections.add(include(projectFields));
+      if (include_id) {
+        projections.add(include("_id"));
+      } else {
+        projections.add(excludeId());
+      }
     }
     if (debug) {
       projections.add(meta("_scoreDetails", "searchScoreDetails"));
@@ -176,13 +180,18 @@ public class SearchServlet extends HttpServlet {
     if (includeScore) {
       projections.add(metaSearchScore("_score"));
     }
-    Bson projection = fields(projections);
 
     // Using $facet stage to provide both the documents and $$SEARCH_META data.
     // The $$SEARCH_META data contains the total matching document count, etc
+
+    List<Bson> facetStages = new ArrayList<>();
+    facetStages.add(skip(skip));
+    facetStages.add(limit(limit));
+    if (projections.size() > 0) {
+      facetStages.add(project(fields(projections)));
+    }
     Bson facetStage = new Document("$facet",
-      new Document("docs",
-        Arrays.asList(skip(skip), limit(limit), project(projection)))
+      new Document("docs", facetStages)
       .append("meta",
         Arrays.asList(new Document("$replaceWith", "$$SEARCH_META"), limit(1)))
     );
