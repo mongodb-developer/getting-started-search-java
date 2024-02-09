@@ -1,22 +1,25 @@
-package com.mongodb.atlas;
+package com.mongodb.atlas.search;
 
 import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.search.CompoundSearchOperator;
 import com.mongodb.client.model.search.SearchCount;
 import com.mongodb.client.model.search.SearchOperator;
+import com.mongodb.client.model.search.SearchOptions;
 import com.mongodb.client.model.search.SearchPath;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.bson.Document;
-import org.bson.conversions.Bson;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -24,18 +27,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
-
-import static com.mongodb.client.model.Aggregates.facet;
-import static com.mongodb.client.model.Aggregates.limit;
-import static com.mongodb.client.model.Aggregates.project;
-import static com.mongodb.client.model.Aggregates.search;
-import static com.mongodb.client.model.Aggregates.skip;
-import static com.mongodb.client.model.Projections.excludeId;
-import static com.mongodb.client.model.Projections.fields;
-import static com.mongodb.client.model.Projections.include;
-import static com.mongodb.client.model.Projections.meta;
-import static com.mongodb.client.model.Projections.metaSearchScore;
-import static com.mongodb.client.model.search.SearchOptions.searchOptions;
 
 public class SearchServlet extends HttpServlet {
   private MongoCollection<Document> collection;
@@ -155,9 +146,9 @@ public class SearchServlet extends HttpServlet {
     if (filterOperators.size() > 0)
       operator = operator.filter(filterOperators);
 
-    Bson searchStage = search(
+    Bson searchStage = Aggregates.search(
         operator,
-        searchOptions()
+        SearchOptions.searchOptions()
             .option("scoreDetails", debug)
             .index(indexName)
             .count(SearchCount.total())
@@ -167,33 +158,33 @@ public class SearchServlet extends HttpServlet {
     List<Bson> projections = new ArrayList<>();
     if (projectFieldsValue != null) {
       // Don't add _id inclusion or exclusion if no `project` parameter specified
-      projections.add(include(projectFields));
+      projections.add(Projections.include(projectFields));
       if (include_id) {
-        projections.add(include("_id"));
+        projections.add(Projections.include("_id"));
       } else {
-        projections.add(excludeId());
+        projections.add(Projections.excludeId());
       }
     }
     if (debug) {
-      projections.add(meta("_scoreDetails", "searchScoreDetails"));
+      projections.add(Projections.meta("_scoreDetails", "searchScoreDetails"));
     }
     if (includeScore) {
-      projections.add(metaSearchScore("_score"));
+      projections.add(Projections.metaSearchScore("_score"));
     }
 
     // Using $facet stage to provide both the documents and $$SEARCH_META data.
     // The $$SEARCH_META data contains the total matching document count, etc
 
     List<Bson> facetStages = new ArrayList<>();
-    facetStages.add(skip(skip));
-    facetStages.add(limit(limit));
+    facetStages.add(Aggregates.skip(skip));
+    facetStages.add(Aggregates.limit(limit));
     if (projections.size() > 0) {
-      facetStages.add(project(fields(projections)));
+      facetStages.add(Aggregates.project(Projections.fields(projections)));
     }
     Bson facetStage = new Document("$facet",
       new Document("docs", facetStages)
       .append("meta",
-        Arrays.asList(new Document("$replaceWith", "$$SEARCH_META"), limit(1)))
+        Arrays.asList(new Document("$replaceWith", "$$SEARCH_META"), Aggregates.limit(1)))
     );
 
     AggregateIterable<Document> aggregationResults = collection.aggregate(List.of(

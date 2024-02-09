@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search</title>
+</head>
+<body>
+<script src="jquery-3.7.1.min.js"></script>
+<script>
+    window.onload = function() {
+
+        alert( "Search it" );
+
+    };
+
+    $.ajax({
+        url: "/search",
+        data: {
+            q: "foo"
+        },
+        success: function( result ) {
+            $( "#results" ).html( "Results: <br/><strong>" + result + "</strong>" );
+        }
+    });
+
+
+</script>
+
+<div id="results"></div>
+
+</body>
+</html>

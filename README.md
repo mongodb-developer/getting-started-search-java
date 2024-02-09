@@ -18,9 +18,10 @@ In order to run the `FirstSearchExample`, follow these steps:
 
 ## Search Server Example
 
-This Search Server example code was written for the article
+This Search Server example code was initially written for the article
 ("How to Build a Search Service in Java with MongoDB")[TBD].
-It uses the `jettyRun` target and searches the `movies_index`
+It uses the `jettyRun` target and searches the `movies_index`. The search
+server code lives under `server/`
 
 To run the search server locally, follow these steps:
 
@@ -28,6 +29,7 @@ To run the search server locally, follow these steps:
     * If you're not already an Atlas user, [get started with Atlas](https://www.mongodb.com/docs/atlas/getting-started/)
   * [Create an Atlas Search index](https://www.mongodb.com/docs/atlas/atlas-search/tutorial/create-index/) on the `movies` collection, named `movies_index`, using the index
     configuration below.
+  * `cd server/` - work within the server directory. 
   * Run the search service:
     `ATLAS_URI="<<insert your connection string here>>" ./gradlew jettyRun`
   * Visit [http://localhost:8080](http://localhost:8080)
